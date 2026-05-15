@@ -1,0 +1,11 @@
+*.log
+.venv/
+*.zip
+*.csv
+*.tar.gz
+*.mp4
+*.avi
+models/*.pth
+models/*.h5
+data/raw/
+data/processed/
