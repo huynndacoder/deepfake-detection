@@ -1,9 +1,21 @@
-*.log
+# Environment
 .venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Raw datasets / large files
+data/raw/
+data/processed/
 *.zip
-*.csv
 *.tar.gz
 *.mp4
 *.avi
+
+# Models
 models/
-models/
+*.h5
+*.keras
+
+# Logs
+*.log
