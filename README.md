@@ -13,7 +13,7 @@ Binary classification of real vs. AI-generated face images using the
 - [x] Initial EDA (`01_eda.ipynb`)
 - [ ] SVM + HOG baseline (`02_baseline.ipynb`)
 - [ ] Custom CNN (`03_cnn.ipynb`)
-- [ ] Transfer Learning — MobileNetV2 / EfficientNetB0 (`04_transfer.ipynb`)
+- [ ] Transfer Learning — MobileNet / EfficientNetB0 (`04_transfer.ipynb`)
 - [ ] Error analysis & Grad-CAM (`05_error_analysis.ipynb`)
 - [ ] Final report (5–6 pages, IEEE format)
 - [ ] Final slides (≤ 10 slides)
@@ -27,7 +27,7 @@ Binary classification of real vs. AI-generated face images using the
 | Introduce ML problem | Problem Statement (below) |
 | Related work survey | 9 references — see References table |
 | Dataset analysis | `01_eda.ipynb` |
-| At least 3 ML methods | SVM + HOG · Custom CNN · MobileNetV2 / EfficientNetB0 |
+| At least 3 ML methods | SVM + HOG · Custom CNN · MobileNet / EfficientNetB0 |
 | Evaluation metrics | Accuracy · Precision · Recall · F1 · AUC · Confusion Matrix |
 | Error analysis | `05_error_analysis.ipynb` |
 | Limitations & future work | Cross-generator generalization · Grad-CAM explainability |
@@ -57,7 +57,7 @@ deepfake-detection/
 │   ├── 01_eda.ipynb          # Exploratory Data Analysis
 │   ├── 02_baseline.ipynb     # Model 1 — SVM + HOG features
 │   ├── 03_cnn.ipynb          # Model 2 — Custom CNN (Keras)
-│   ├── 04_transfer.ipynb     # Model 3 — Transfer Learning (MobileNetV2 / EfficientNetB0)
+│   ├── 04_transfer.ipynb     # Model 3 — Transfer Learning (MobileNet / EfficientNetB0)
 │   └── 05_error_analysis.ipynb  # Error analysis + Grad-CAM visualisation
 ├── src/
 │   ├── dataset.py            # Data loading, splitting, augmentation pipeline
@@ -79,7 +79,7 @@ deepfake-detection/
 |---|-------|------|---------|
 | 1 | SVM + HOG features | Traditional ML baseline | scikit-learn |
 | 2 | Custom CNN | Deep Learning | TensorFlow / Keras |
-| 3 | MobileNetV2 (fine-tuned) | Transfer Learning | TensorFlow / Keras |
+| 3 | MobileNet (fine-tuned) | Transfer Learning | PyTorch |
 | 4 | EfficientNetB0 (fine-tuned) | Transfer Learning | TensorFlow / Keras |
 
 ---
@@ -161,5 +161,5 @@ notebooks/05_error_analysis.ipynb → Error analysis & Grad-CAM
 |-------|----------|----------|-----|
 | SVM + HOG | — | — | — |
 | Custom CNN | — | — | — |
-| MobileNetV2 | — | — | — |
+| MobileNet | — | — | — |
 | EfficientNetB0 | — | — | — |
