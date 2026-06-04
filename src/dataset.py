@@ -9,15 +9,16 @@ from sklearn.model_selection import train_test_split
 
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-IMG_SIZE    = (224, 224)   # center-crop from 256×256, đã chốt trong PROJECT_CONTEXT
-BATCH_SIZE  = 32
-AUTOTUNE    = tf.data.AUTOTUNE
+IMG_SIZE = (224, 224)  # center-crop from 256×256, đã chốt trong PROJECT_CONTEXT
+BATCH_SIZE = 32
+AUTOTUNE = tf.data.AUTOTUNE
 
 # Label convention đã chốt: fake=0, real=1
 LABEL_MAP = {"Fake faces": 0, "Real faces": 1}
 
 
 # ── 1. Build DataFrame ─────────────────────────────────────────────────────────
+
 
 def build_dataframe(data_dir: str | os.PathLike) -> pd.DataFrame:
     """
@@ -53,9 +54,10 @@ def build_dataframe(data_dir: str | os.PathLike) -> pd.DataFrame:
 
 # ── 2. Split DataFrame ─────────────────────────────────────────────────────────
 
+
 def split_dataframe(
     df: pd.DataFrame,
-    val_size:  float = 0.15,
+    val_size: float = 0.15,
     test_size: float = 0.15,
     random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -91,23 +93,24 @@ def split_dataframe(
     )
 
     train_df = train_df.reset_index(drop=True)
-    val_df   = val_df.reset_index(drop=True)
-    test_df  = test_df.reset_index(drop=True)
+    val_df = val_df.reset_index(drop=True)
+    test_df = test_df.reset_index(drop=True)
 
     return train_df, val_df, test_df
 
 
 # ── 3. tf.data Pipeline (cho CNN / Transfer Learning) ─────────────────────────
 
+
 def _parse_image(path: tf.Tensor, label: tf.Tensor, img_size: tuple) -> tuple:
     """
     Đọc file ảnh → decode → resize → normalize về [0, 1].
     Đây là hàm nội bộ, được map vào tf.data.Dataset.
     """
-    raw   = tf.io.read_file(path)
-    image = tf.image.decode_png(raw, channels=3)        # PNG → RGB tensor
-    image = tf.image.resize(image, img_size)            # resize về img_size
-    image = tf.cast(image, tf.float32) / 255.0          # normalize [0,1]
+    raw = tf.io.read_file(path)
+    image = tf.image.decode_png(raw, channels=3)  # PNG → RGB tensor
+    image = tf.image.resize(image, img_size)  # resize về img_size
+    image = tf.cast(image, tf.float32) / 255.0  # normalize [0,1]
     return image, label
 
 
@@ -121,16 +124,16 @@ def _augment(image: tf.Tensor, label: tf.Tensor) -> tuple:
     image = tf.image.random_flip_left_right(image)
     image = tf.image.random_brightness(image, max_delta=0.1)
     image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
-    image = tf.clip_by_value(image, 0.0, 1.0)   # giữ trong [0,1] sau jitter
+    image = tf.clip_by_value(image, 0.0, 1.0)  # giữ trong [0,1] sau jitter
     return image, label
 
 
 def make_tf_dataset(
     df: pd.DataFrame,
-    img_size:   tuple = IMG_SIZE,
-    batch_size: int   = BATCH_SIZE,
-    augment:    bool  = False,
-    shuffle:    bool  = False,
+    img_size: tuple = IMG_SIZE,
+    batch_size: int = BATCH_SIZE,
+    augment: bool = False,
+    shuffle: bool = False,
 ) -> tf.data.Dataset:
     """
     Tạo tf.data.Dataset từ DataFrame.
@@ -149,7 +152,7 @@ def make_tf_dataset(
         image_batch shape: (batch_size, H, W, 3)
         label_batch shape: (batch_size,)
     """
-    paths  = df["path"].values
+    paths = df["path"].values
     labels = df["label"].values.astype(np.int32)
 
     dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
@@ -173,6 +176,7 @@ def make_tf_dataset(
 
 # ── 4. Numpy loader (cho SVM + HOG) ───────────────────────────────────────────
 
+
 def load_images_numpy(
     df: pd.DataFrame,
     img_size: tuple = IMG_SIZE,
@@ -191,9 +195,70 @@ def load_images_numpy(
         img = img.resize(img_size, Image.BILINEAR)
         images.append(np.array(img, dtype=np.float32) / 255.0)
 
-    X = np.stack(images, axis=0)    # (N, H, W, 3)
+    X = np.stack(images, axis=0)  # (N, H, W, 3)
     y = df["label"].values.astype(np.int32)
     return X, y
+
+
+# ── 5. PyTorch DataLoader (cho src/run_training.py) ──────────────────────────
+
+
+def create_dataloaders(
+    data_dir,
+    image_size=224,
+    batch_size=32,
+    num_workers=2,
+):
+    import torch
+    from torchvision import datasets, transforms
+
+    data_dir = pathlib.Path(data_dir)
+    train_dir = data_dir / "train"
+    val_dir = data_dir / "val"
+    test_dir = data_dir / "test"
+
+    if not train_dir.exists():
+        raise FileNotFoundError(
+            f"Train directory not found: {train_dir}\n"
+            f"Run notebooks 02–04 first to generate processed splits."
+        )
+
+    train_transform = transforms.Compose(
+        [
+            transforms.Resize(int(image_size * 1.143)),
+            transforms.CenterCrop(image_size),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
+    eval_transform = transforms.Compose(
+        [
+            transforms.Resize(int(image_size * 1.143)),
+            transforms.CenterCrop(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
+    train_dataset = datasets.ImageFolder(str(train_dir), transform=train_transform)
+    val_dataset = datasets.ImageFolder(str(val_dir), transform=eval_transform)
+    test_dataset = datasets.ImageFolder(str(test_dir), transform=eval_transform)
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+
+    return train_loader, val_loader, test_loader, train_dataset.class_to_idx
+
 
 # ── Quick test ──────────────────────────────────
 if __name__ == "__main__":
@@ -201,7 +266,7 @@ if __name__ == "__main__":
 
     # Tự tìm project root
     root = pathlib.Path(__file__).resolve().parent.parent
-    data_dir = root / "data" / "raw" 
+    data_dir = root / "data" / "raw"
 
     print(f"Data dir: {data_dir}")
     print("=" * 50)
@@ -220,8 +285,10 @@ if __name__ == "__main__":
     train_ds = make_tf_dataset(train_df, augment=True, shuffle=True)
     for images, labels in train_ds.take(1):
         print(f"\n[OK] make_tf_dataset:")
-        print(f"     images.shape = {images.shape}")   # (32, 224, 224, 3)
-        print(f"     labels.shape = {labels.shape}")   # (32,)
-        print(f"     pixel range  = [{images.numpy().min():.2f}, {images.numpy().max():.2f}]")
+        print(f"     images.shape = {images.shape}")  # (32, 224, 224, 3)
+        print(f"     labels.shape = {labels.shape}")  # (32,)
+        print(
+            f"     pixel range  = [{images.numpy().min():.2f}, {images.numpy().max():.2f}]"
+        )
 
     print("\n✅ dataset.py OK")

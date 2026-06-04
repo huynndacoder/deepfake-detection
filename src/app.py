@@ -7,17 +7,11 @@ import torch
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from src.models import (
-    discover_models,
-    load_model_from_checkpoint,
-    get_gradcam_target,
-    get_model_display_name,
-)
+from src.models import load_model_from_checkpoint, get_gradcam_target
 from src.predict import preprocess_image, predict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MODELS_DIR = PROJECT_ROOT / "models"
-DEMO_DIR = PROJECT_ROOT / "assets" / "demo"
+MODEL_PATH = PROJECT_ROOT / "models" / "mobilenet_best.pt"
 
 
 class GradCAM:
@@ -69,16 +63,7 @@ def overlay_heatmap(image, cam):
     cam_resized = cv2.resize(cam, (image.shape[1], image.shape[0]))
     heatmap = np.uint8(255 * cam_resized)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    overlay = cv2.addWeighted(image, 0.5, heatmap, 0.5, 0)
-    return overlay
-
-
-def create_color_legend(width=200, height=20):
-    import cv2
-
-    gradient = np.tile(np.linspace(0, 255, width, dtype=np.uint8), (height, 1))
-    legend = cv2.applyColorMap(gradient, cv2.COLORMAP_JET)
-    return legend
+    return cv2.addWeighted(image, 0.5, heatmap, 0.5, 0)
 
 
 def make_heatmap_only(cam, target_shape):
@@ -87,8 +72,7 @@ def make_heatmap_only(cam, target_shape):
     h, w = target_shape[:2]
     cam_resized = cv2.resize(cam, (w, h))
     heatmap = np.uint8(255 * cam_resized)
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    return heatmap
+    return cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
 
 
 def compute_activation_stats(cam):
@@ -118,6 +102,13 @@ def generate_interpretive_caption(cam, rgb_image, pred_label, confidence):
 
     if len(faces) > 0:
         x, y, w, h = max(faces, key=lambda b: b[2] * b[3])
+
+        scale_x = cam.shape[1] / rgb_image.shape[1]
+        scale_y = cam.shape[0] / rgb_image.shape[0]
+        x = int(x * scale_x)
+        y = int(y * scale_y)
+        w = max(1, int(w * scale_x))
+        h = max(1, int(h * scale_y))
         x, y = max(0, x), max(0, y)
         w, h = min(w, cam.shape[1] - x), min(h, cam.shape[0] - y)
         face_cam = cam[y : y + h, x : x + w]
@@ -167,8 +158,11 @@ def generate_interpretive_caption(cam, rgb_image, pred_label, confidence):
     return caption
 
 
-def run_analysis(uploaded_image, model_path):
-    model, model_type, device = load_model_from_checkpoint(model_path)
+def run_analysis(uploaded_image):
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
+
+    model, model_type, device = load_model_from_checkpoint(MODEL_PATH)
     img_tensor = preprocess_image(uploaded_image)
     img_tensor_device = img_tensor.to(device)
     pred_label, confidence, probs = predict(model, img_tensor, device)
@@ -188,7 +182,6 @@ def run_analysis(uploaded_image, model_path):
         "label": pred_label,
         "confidence": confidence,
         "probs": probs,
-        "model_type": model_type,
         "heatmap_overlay": heatmap_overlay,
         "heatmap_only": heatmap_only,
         "original_rgb": original_rgb,
@@ -197,204 +190,30 @@ def run_analysis(uploaded_image, model_path):
     }
 
 
-def load_demo_images():
-    if not DEMO_DIR.exists():
-        return []
-    images = sorted(DEMO_DIR.glob("*"))
-    return [
-        {"name": f.stem.replace("_", " ").title(), "path": str(f)}
-        for f in images
-        if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-    ]
-
-
-def render_result(confidence_threshold):
-    res = st.session_state.result
-    if res is None:
-        return
-
-    is_low_confidence = res["confidence"] < confidence_threshold
-    color = "red" if res["label"] == "fake" else "green"
-    emoji = "🤖" if res["label"] == "fake" else "👤"
-
-    with st.container(border=True):
-        col_head, col_conf = st.columns([2, 1])
-        with col_head:
-            st.markdown(
-                f"<h2 style='color:{color}; margin:0;'>{emoji} {res['label'].upper()}</h2>",
-                unsafe_allow_html=True,
-            )
-        with col_conf:
-            st.metric("Confidence", f"{res['confidence']:.1%}")
-
-        st.progress(
-            float(res["confidence"]),
-            text=f"Confidence — {res['confidence']:.1%}",
-        )
-
-        class_names = ["Fake", "Real"]
-        prob_df = {
-            "Class": class_names,
-            "Probability": [res["probs"][0], res["probs"][1]],
-        }
-        st.bar_chart(prob_df, x="Class", y="Probability", horizontal=True)
-
-        if is_low_confidence:
-            st.warning(
-                f"Low-confidence prediction — confidence is below the "
-                f"selected threshold ({confidence_threshold:.0%}). "
-                f"This result should be interpreted with caution."
-            )
-        else:
-            confidence_level = "High" if res["confidence"] >= 0.90 else "Moderate"
-            st.success(
-                f"{confidence_level}-confidence prediction. "
-                f"The model is relatively certain about this result."
-            )
-
-    st.caption(f"Prediction made using {res.get('display_name', res['model_type'])}")
-
-
-def render_gradcam_tab():
-    res = st.session_state.result
-    if res is None:
-        return
-
-    try:
-        viz_col1, viz_col2 = st.columns(2)
-        with viz_col1:
-            st.image(
-                res["original_rgb"],
-                caption="Preprocessed image (224x224)",
-                use_container_width=True,
-            )
-        with viz_col2:
-            st.image(
-                res["heatmap_only"],
-                caption="Grad-CAM heatmap",
-                use_container_width=True,
-            )
-
-        st.image(
-            res["heatmap_overlay"],
-            caption="Overlay — areas the model relied on for this prediction",
-            use_container_width=True,
-        )
-
-        legend = create_color_legend()
-        st.image(legend, use_container_width=True)
-        leg_col1, leg_col2 = st.columns([0.5, 0.5])
-        with leg_col1:
-            st.caption("Low influence")
-        with leg_col2:
-            st.caption("High influence")
-
-    except Exception as e:
-        st.warning(f"Grad-CAM visualization failed: {e}")
-
-
-def render_stats_tab():
-    res = st.session_state.result
-    if res is None:
-        return
-
-    stats = res["stats"]
-    st1, st2, st3 = st.columns(3)
-    with st1:
-        st.metric(
-            "Active Area",
-            f"{stats['active_ratio']:.0%}",
-            help="Fraction of the image with activation above 0.20",
-        )
-    with st2:
-        st.metric(
-            "Peak Activation",
-            f"{stats['max_activation']:.0%}",
-            help="Maximum activation value in the heatmap",
-        )
-    with st3:
-        n = stats["n_regions"]
-        st.metric(
-            "Focus Regions",
-            str(n) if n > 0 else "1",
-            help="Number of distinct high-activation areas",
-        )
-
-    st.info(res["caption"])
-
-
 st.set_page_config(page_title="Deepfake Detector", page_icon="🔍", layout="wide")
 
 st.title("Deepfake Face Detector")
-st.markdown("Upload a face image to detect whether it is **real** or **AI-generated**.")
+st.markdown(
+    "Upload a face image to detect whether it is **real** or **AI-generated** using **MobileNet**."
+)
 
-available_models = discover_models(MODELS_DIR)
-
-if not available_models:
+if not MODEL_PATH.exists():
     st.error(
-        "No trained models found in `models/`. Train one first:\n\n"
+        f"Model not found at `{MODEL_PATH}`. Train it first:\n\n"
         "```bash\npython -m src.run_training --model mobilenet\n```"
     )
     st.stop()
 
-if "uploaded_image" not in st.session_state:
-    st.session_state.uploaded_image = None
-if "result" not in st.session_state:
-    st.session_state.result = None
-if "selected_model_path" not in st.session_state:
-    st.session_state.selected_model_path = available_models[0]["path"]
-
 with st.expander("How to use", icon="📖"):
     st.markdown(
         """
-    1. **Select a model** in the sidebar — choose which trained detector to use.
-    2. **Upload an image** below, or pick a demo image if available.
-    3. **Click "Analyze Image"** — the model will process it and show results.
-    4. **Review the tabs** — inspect the prediction, Grad-CAM heatmap, and activation statistics.
+    1. **Upload an image** of a face below.
+    2. **Click "Analyze Image"** to run detection.
+    3. **Review the tabs** — prediction, Grad-CAM heatmap, and activation statistics.
     """
     )
 
 with st.sidebar:
-    st.header("Model")
-
-    selected_model = next(
-        (
-            m
-            for m in available_models
-            if m["path"] == st.session_state.selected_model_path
-        ),
-        available_models[0],
-    )
-
-    model_labels = [
-        m["display_name"] + " (" + m["name"] + ")" for m in available_models
-    ]
-    default_idx = next(
-        (
-            i
-            for i, m in enumerate(available_models)
-            if m["path"] == st.session_state.selected_model_path
-        ),
-        0,
-    )
-
-    selected_label = st.selectbox(
-        "Select Model",
-        options=model_labels,
-        index=default_idx,
-        help="Choose which trained model to use for detection.",
-    )
-    chosen_model = available_models[model_labels.index(selected_label)]
-
-    if chosen_model["path"] != st.session_state.selected_model_path:
-        st.session_state.selected_model_path = chosen_model["path"]
-        st.session_state.result = None
-        st.rerun()
-
-    st.caption(f"Checkpoint: `{chosen_model['name']}.pt`")
-    st.caption(f"Architecture: {get_model_display_name(chosen_model['model_type'])}")
-
-    st.divider()
     st.header("Settings")
     confidence_threshold = st.slider(
         "Confidence Threshold",
@@ -408,42 +227,17 @@ with st.sidebar:
     st.divider()
     st.header("About")
     st.markdown(
-        f"""
+        """
+    **Model:** MobileNet (Transfer Learning)
+
     **Dataset:** 10,000 real · 10,000 fake
     faces at 256×256 resolution.
-    
+
     **Classes:** Real · Fake
     """
     )
     st.divider()
     st.markdown("*DS102 — Statistical Machine Learning*")
-
-demo_images = load_demo_images()
-if demo_images:
-    st.markdown("#### Demo Images")
-    COLS_PER_ROW = 4
-    rows = (len(demo_images) + COLS_PER_ROW - 1) // COLS_PER_ROW
-    for row in range(rows):
-        cols = st.columns(COLS_PER_ROW)
-        for ci in range(COLS_PER_ROW):
-            idx = row * COLS_PER_ROW + ci
-            if idx >= len(demo_images):
-                break
-            demo = demo_images[idx]
-            with cols[ci]:
-                try:
-                    demo_pil = Image.open(demo["path"])
-                    st.image(demo_pil, caption=demo["name"], use_container_width=True)
-                except Exception:
-                    st.image(
-                        np.zeros((100, 100, 3), dtype=np.uint8),
-                        caption=demo["name"],
-                        use_container_width=True,
-                    )
-                if st.button("Use", key=f"demo_{idx}", use_container_width=True):
-                    st.session_state.uploaded_image = Image.open(demo["path"]).copy()
-                    st.session_state.result = None
-    st.divider()
 
 uploaded_file = st.file_uploader(
     "Choose a face image...",
@@ -451,43 +245,112 @@ uploaded_file = st.file_uploader(
     help="Upload a face image to check if it's real or AI-generated.",
 )
 
-if uploaded_file is not None:
-    st.session_state.uploaded_image = Image.open(uploaded_file)
+if "result" not in st.session_state:
     st.session_state.result = None
 
-if st.session_state.uploaded_image is not None:
+if uploaded_file is not None:
+    uploaded_image = Image.open(uploaded_file)
     col_left, col_right = st.columns([1, 1])
     with col_left:
-        st.image(
-            st.session_state.uploaded_image,
-            caption="Uploaded Image",
-            use_container_width=True,
-        )
+        st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
 
     if st.button("Analyze Image", type="primary", use_container_width=True):
-        with st.spinner(f"Loading {chosen_model['display_name']}..."):
+        with st.spinner("Running MobileNet..."):
             try:
-                result = run_analysis(
-                    st.session_state.uploaded_image,
-                    st.session_state.selected_model_path,
-                )
-                result["display_name"] = chosen_model["display_name"]
-                st.session_state.result = result
-            except FileNotFoundError:
-                st.error("Model file not found. Please train the model first.")
+                st.session_state.result = run_analysis(uploaded_image)
+            except Exception as e:
+                st.error(f"Analysis failed: {e}")
                 st.stop()
 
     if st.session_state.result is not None:
+        res = st.session_state.result
         with col_right:
             tab_pred, tab_gradcam, tab_stats = st.tabs(
                 ["Prediction", "Grad-CAM", "Stats"]
             )
             with tab_pred:
-                render_result(confidence_threshold)
+                color = "red" if res["label"] == "fake" else "green"
+                emoji = "🤖" if res["label"] == "fake" else "👤"
+
+                with st.container(border=True):
+                    st.markdown(
+                        f"<h2 style='color:{color}; margin:0;'>{emoji} {res['label'].upper()}</h2>",
+                        unsafe_allow_html=True,
+                    )
+                    col_m1, col_m2 = st.columns([2, 1])
+                    with col_m2:
+                        st.metric("Confidence", f"{res['confidence']:.1%}")
+
+                    st.progress(
+                        float(res["confidence"]),
+                        text=f"Confidence — {res['confidence']:.1%}",
+                    )
+
+                    prob_df = {
+                        "Class": ["Fake", "Real"],
+                        "Probability": [float(res["probs"][0]), float(res["probs"][1])],
+                    }
+                    st.bar_chart(prob_df, x="Class", y="Probability", horizontal=True)
+
+                    if res["confidence"] < confidence_threshold:
+                        st.warning(
+                            f"Low-confidence prediction ({confidence_threshold:.0%} threshold). Interpret with caution."
+                        )
+                    elif res["confidence"] >= 0.90:
+                        st.success("High-confidence prediction.")
+                    else:
+                        st.info("Moderate-confidence prediction.")
+
+                st.caption("Prediction made using MobileNet (Transfer Learning)")
+
             with tab_gradcam:
-                render_gradcam_tab()
+                try:
+                    viz_col1, viz_col2 = st.columns(2)
+                    with viz_col1:
+                        st.image(
+                            res["original_rgb"],
+                            caption="Preprocessed image (224x224)",
+                            use_container_width=True,
+                        )
+                    with viz_col2:
+                        st.image(
+                            res["heatmap_only"],
+                            caption="Grad-CAM heatmap",
+                            use_container_width=True,
+                        )
+
+                    st.image(
+                        res["heatmap_overlay"],
+                        caption="Overlay — areas the model relied on",
+                        use_container_width=True,
+                    )
+
+                    import cv2
+
+                    legend = np.tile(np.linspace(0, 255, 200, dtype=np.uint8), (20, 1))
+                    legend = cv2.applyColorMap(legend, cv2.COLORMAP_JET)
+                    st.image(legend, use_container_width=True)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.caption("Low influence")
+                    with c2:
+                        st.caption("High influence")
+
+                except Exception as e:
+                    st.warning(f"Grad-CAM visualization failed: {e}")
+
             with tab_stats:
-                render_stats_tab()
+                stats = res["stats"]
+                st1, st2, st3 = st.columns(3)
+                with st1:
+                    st.metric("Active Area", f"{stats['active_ratio']:.0%}")
+                with st2:
+                    st.metric("Peak Activation", f"{stats['max_activation']:.0%}")
+                with st3:
+                    n = stats["n_regions"]
+                    st.metric("Focus Regions", str(n) if n > 0 else "1")
+
+                st.info(res["caption"])
 
 st.divider()
 st.caption(

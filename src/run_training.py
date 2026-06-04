@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.models import build_model, get_registered_model_names
 from src.dataset import create_dataloaders
 from src.train import train_model
-from src.evaluate import evaluate_model, print_metrics
+from src.evaluate import evaluate_model_pt, print_metrics
 
 
 def main():
@@ -73,7 +73,7 @@ def main():
     )
 
     print("\nEvaluating on test set...")
-    metrics = evaluate_model(model, test_loader)
+    metrics = evaluate_model_pt(model, test_loader, model_name=model_type)
     print_metrics(metrics)
     print(f"\nModel saved to: {MODEL_SAVE_PATH}")
 
