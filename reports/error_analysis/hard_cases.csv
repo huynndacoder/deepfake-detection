@@ -1,0 +1,20 @@
+test_idx,path,true_label,svm_pred,cnn_pred,mobile_pred,mobile_prob
+40,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Real faces\real_1562.png,1,0,0,0,0.01375903
+62,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_9013.png,0,1,1,1,0.9741182
+119,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_8363.png,0,1,1,1,0.7505189
+396,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_5441.png,0,1,1,1,0.82644045
+600,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_8208.png,0,1,1,1,0.68771774
+710,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_6676.png,0,1,1,1,0.93166226
+1129,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_5632.png,0,1,1,1,0.5944418
+1189,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Real faces\real_5410.png,1,0,0,0,0.054184563
+1370,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_4075.png,0,1,1,1,0.9999726
+1437,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_486.png,0,1,1,1,0.9214602
+1455,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_3273.png,0,1,1,1,0.98752856
+1770,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_8676.png,0,1,1,1,0.84801793
+1787,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Real faces\real_7626.png,1,0,0,0,0.38440114
+2126,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_8662.png,0,1,1,1,0.9830465
+2242,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Real faces\real_9619.png,1,0,0,0,0.005235483
+2287,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_4550.png,0,1,1,1,0.9320128
+2455,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_2002.png,0,1,1,1,0.99993694
+2911,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Fake faces\fake_8527.png,0,1,1,1,0.99437886
+2941,e:\HK4\Sta_ML\DO_ÂNNANANANNA\deepfake-detection\data\raw\Real faces\real_8763.png,1,0,0,0,0.109710895
