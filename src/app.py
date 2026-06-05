@@ -63,7 +63,8 @@ def overlay_heatmap(image, cam):
     cam_resized = cv2.resize(cam, (image.shape[1], image.shape[0]))
     heatmap = np.uint8(255 * cam_resized)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    return cv2.addWeighted(image, 0.5, heatmap, 0.5, 0)
+    overlay = cv2.addWeighted(image, 0.5, heatmap, 0.5, 0)
+    return cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
 
 
 def make_heatmap_only(cam, target_shape):
@@ -72,7 +73,8 @@ def make_heatmap_only(cam, target_shape):
     h, w = target_shape[:2]
     cam_resized = cv2.resize(cam, (w, h))
     heatmap = np.uint8(255 * cam_resized)
-    return cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    return cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
 
 def compute_activation_stats(cam):
@@ -252,9 +254,9 @@ if uploaded_file is not None:
     uploaded_image = Image.open(uploaded_file)
     col_left, col_right = st.columns([1, 1])
     with col_left:
-        st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
+        st.image(uploaded_image, caption="Uploaded Image", width="stretch")
 
-    if st.button("Analyze Image", type="primary", use_container_width=True):
+    if st.button("Analyze Image", type="primary", width="stretch"):
         with st.spinner("Running MobileNet..."):
             try:
                 st.session_state.result = run_analysis(uploaded_image)
@@ -310,26 +312,27 @@ if uploaded_file is not None:
                         st.image(
                             res["original_rgb"],
                             caption="Preprocessed image (224x224)",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     with viz_col2:
                         st.image(
                             res["heatmap_only"],
                             caption="Grad-CAM heatmap",
-                            use_container_width=True,
+                            width="stretch",
                         )
 
                     st.image(
                         res["heatmap_overlay"],
                         caption="Overlay — areas the model relied on",
-                        use_container_width=True,
+                        width="stretch",
                     )
 
                     import cv2
 
                     legend = np.tile(np.linspace(0, 255, 200, dtype=np.uint8), (20, 1))
                     legend = cv2.applyColorMap(legend, cv2.COLORMAP_JET)
-                    st.image(legend, use_container_width=True)
+                    legend = cv2.cvtColor(legend, cv2.COLOR_BGR2RGB)
+                    st.image(legend, width="stretch")
                     c1, c2 = st.columns(2)
                     with c1:
                         st.caption("Low influence")
