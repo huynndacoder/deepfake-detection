@@ -16,8 +16,6 @@ Binary classification of real vs. AI-generated face images using the
 - [x] Transfer Learning — MobileNet (`04_mobilenet_kaggle.ipynb`)
 - [x] Error analysis (`05_error_analysis.ipynb`)
 - [x] Grad-CAM explainability (`06_gradcam.ipynb`)
-- [ ] Final report (5–6 pages, IEEE format)
-- [ ] Final slides (≤ 10 slides)
 
 ---
 
